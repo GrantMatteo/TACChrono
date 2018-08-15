@@ -47,6 +47,7 @@
 # @param end_span The location of the last character
 # @param type The type of the entity
 # @param parent_type The parent type of the entity
+import re
 class ChronoEntity:
 
     ## The constructor
@@ -165,7 +166,7 @@ class ChronoFrequencyEntity(ChronoEntity):
     def print_xml(self):
         return (super().print_xml()) + "\t<Type>{}</Type>\n\t\t\t<Text>{}</Text>\n\t\t</properties>\n\t</entity>\n".format("Frequency", self.text)
     def print_ann(self):
-        return ("T{}\tFrequency {} {}\t{}".format(self.id, self.span[0], self.span[1], self.text))
+        return ("T{}\tFrequency {} {}\t{}".format(re.sub("entity", "", self.id), self.span[0], self.span[1], self.text))
 class ChronoDoseDurationEntity(ChronoEntity):
     def __init__(self, entityID, start_span, end_span, dose_type, number, text,
                  modifier=None):
@@ -199,7 +200,7 @@ class ChronoDoseDurationEntity(ChronoEntity):
                                       "\t\t\t<Modifier>{}</Modifier>\n\t\t</properties>\n\t</entity>\n".format(
             self.dose_type, self.text, self.number or '', self.modifier or ''))
     def print_ann(self):
-        return ("T{}\tDuration {} {}\t{}".format( self.entityID, self.start_span, self.end_span, self.text))
+        return ("T{}\tDuration {} {}\t{}".format(re.sub("entity", "",self.entityID), self.start_span, self.end_span, self.text))
 ## Super class for Intervals which are defined as years
 class ChronoIntervalEntity(ChronoEntity):
     def __init__(self, entityID, start_span, end_span, type):

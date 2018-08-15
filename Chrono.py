@@ -81,13 +81,15 @@ if __name__ == "__main__":
     ## Get list of folder names in the input directory
     indirs = []
     infiles = []
-    outfiles = []
+    xml_outfiles = []
+    ann_outfiles = []
     outdirs = []
     for root, dirs, files in os.walk(args.i, topdown = True):
        for name in dirs:
            indirs.append(os.path.join(root, name))
            infiles.append(os.path.join(root,name,name))
-           outfiles.append(os.path.join(args.o,name,name))
+           ann_outfiles.append(os.path.join(args.o, "anns", name))
+           xml_outfiles.append(os.path.join(args.o, name, name))
            outdirs.append(os.path.join(args.o,name))
            if not os.path.exists(os.path.join(args.o,name)):
                os.makedirs(os.path.join(args.o,name))
@@ -175,4 +177,5 @@ if __name__ == "__main__":
         #                                                                     (classifier, args.m), feats))[0])
 
         print("Number of Chrono Entities: " + str(len(chrono_master_list)))
-        utils.write_xml(chrono_list=chrono_master_list, outfile=outfiles[f])
+        utils.write_xml(chrono_list=chrono_master_list, outfile=xml_outfiles[f])
+        utils.write_ann(chrono_list=chrono_master_list, outfile=ann_outfiles[f])

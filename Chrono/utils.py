@@ -110,10 +110,10 @@ def write_xml(chrono_list, outfile):
  ####
 
 def write_ann(chrono_list, outfile):
- fout = open(outfile + ".ann", "w")
- for c in chrono_list:
-     if not type(c) == list:
-        fout.write(str(c.print_ann()) + "\n")
+    with open(outfile + ".ann", "w") as fout:
+        for c in chrono_list:
+            if not type(c) == list:
+                fout.write(str(c.print_ann()) + "\n")
 
 
 
@@ -543,7 +543,6 @@ def combdoseTest(tok):  # may have to fix later
              "pfus",
              "pfu",
              "pb",
-             "pm",
              "μg"
              "ng",
              "wlm"]
@@ -641,16 +640,17 @@ def temporalTest(tok):
         return True, 4
     if tt.hasAMPM(tok):
         return True, 5
-    if tt.hasPartOfWeek(tok):
-        return True, 6
-    if tt.hasSeasonOfYear(tok):
-        return True, 7
+    #if tt.hasPartOfWeek(tok):
+    #    return True, 6
+    #if tt.hasSeasonOfYear(tok):
+    #    return True, 7
     if tt.hasPartOfDay(tok):
         return True, 8
     if tt.hasTimeZone(tok):
         return True, 9
-    if tt.hasTempText(tok):
-        return True, 10
+    #if tt.hasTempText(tok):
+    #    return True, 10
+    #not useful to us
     if tt.hasDoseDuration(tok):
         return True, -1
     #if tt.hasFor(tok):     I'm not sure if I'm going to use this or not yet
@@ -726,7 +726,6 @@ def unitTest(tok):
              "pfus",
              "pfu",
              "pb",
-             "pm",
              "μg"
              "ng",
              "wlm"]
@@ -878,8 +877,9 @@ def getFrequencyPhrases(chroList, text):
 # @author Grant Matteo
 # @param items The list of reference tokens
 def trimExcess(items):
-    #print("trim: ", [item.getText() for item in items])
-    while len(items)>0 and (items[len(items) - 1].isFreqTransition() or items[len(items)-1].isNumeric()):
+    #if ("Once" in [item.getText() for item in items]):
+    #    print("trim: ", [item.getText() for item in items])
+    while len(items)>0 and (items[len(items) - 1].isFreqTransition() or items[len(items)-1].isNumericOnly()):
         items.pop()  # removing trailing numbers or transitions
     firstNonNum=0
     while (firstNonNum<len(items)-1) and (items[firstNonNum].isNumeric()):
@@ -906,7 +906,6 @@ def trimExcess(items):
         else:
             foundAs=False
         n+=1
-
 
     return items
 
@@ -940,7 +939,8 @@ def containsDurationToken(tmpPhrase):
 # @author Grant Matteo
 # @param items The list of reference tokens
 def isValidFreqPhrase(items):
-  #  print("valid?: ",[item.getText() for item in items])
+    #if ("Once" in [item.getText() for item in items]):
+    #    print("valid?: ",[item.getText() for item in items])
     if len(items) > 1:
         fullText= "".join([item.getText() for item in items])
         return (re.search("\%", fullText) is None)
@@ -951,9 +951,11 @@ def isValidFreqPhrase(items):
 
 
         texts= [re.sub("["+string.punctuation+ "]", "", item.getText().lower()) for item in items]
-        singulars=["daily", "nightly", "tuthsa", "mowefr"]
-        intersect =  list(set(texts) & set(singulars)) #find if the texts has any singulars in it
-        return len(intersect)>0
+        text_norm = "".join(texts)
+
+        singulars=["daily", "nightly", "tuthsa", "mowefr", "3xweek", "4xweek"]
+        #find if the texts has any singulars in it
+        return text_norm in singulars
 
 ## Extract dose phrases (strength phrases in N2C2) from the marked list of reference tokens
 # @author Neha Dil

@@ -122,10 +122,10 @@ def hasPeriodInterval(text):
     #convert to list
     text_list = text_norm.split(" ")
     #define my period lists
-    terms = ["decades", "decade", "yesterday", "yesterdays", "today", "todays", "tomorrow", "tomorrows", "day", "week",
-             "month", "year", "daily", "weekly", "monthly", "yearly", "century", "minute", "second", "hour", "hourly", 
-             "days", "weeks", "months", "years", "centuries", "century", "minutes", "seconds", "hours", "time", "shortly", 
-             "soon", "briefly", "awhile", "future", "lately", "annual", "hr", "hrs", "min", "mins", "quarter"] #, "date"]
+    terms = ["day", "week",
+             "month", "daily", "weekly", "monthly", "hour", "hourly",
+             "days", "weeks", "months","hours", "time",
+             "hr", "hrs"] #, "date"]
     ## possibly add in abbreviations like yr, sec, min, etc.
     
     answer = next((m for m in terms if m in text_norm), None)
