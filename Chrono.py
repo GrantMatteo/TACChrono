@@ -165,9 +165,12 @@ if __name__ == "__main__":
 
     
         chroList = utils.markNotable(my_refToks)
-        with open("/home/garnt/Documents/ChroDeb.out", "w") as deb:
-            for chro in chroList:
-                deb.write(chro.getFreqDebug()+"\n")
+        try:
+            with open("/home/garnt/Documents/ChroDeb.out", "w") as deb:
+                for chro in chroList:
+                    deb.write(chro.getFreqDebug()+"\n")
+        except:
+            print("Debug Output to /home/garnt/Documents failed")
         freqPhrases = utils.getFrequencyPhrases(chroList, text)
         #dosePhrases = utils.getDosePhrases()
         #doseDurationPhrases=utils.getDoseDurationPhrases(chroList)
