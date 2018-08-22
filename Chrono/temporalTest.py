@@ -93,7 +93,7 @@ def hasDayOfWeek(text):
     
     #define my day lists
     full_day = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-    abbr_day = ["mon","tues","wed","thurs","fri","sat","sun", "mo", "tu", "we", "th", "fr", "sa", "su", "mowefr", "tuthsa"]
+    abbr_day = ["mon","tues","wed","thurs","fri","sat","sun", "mo", "tu", "we", "th", "fr", "sa", "su", "mowefr", "tuthsa", "qmowefr", "qtuthsa"]
 
     answer = next((m for m in full_day if m in text_norm), None)
     if answer is not None:
@@ -128,7 +128,7 @@ def hasPeriodInterval(text):
              "hr", "hrs"] #, "date"]
     ## possibly add in abbreviations like yr, sec, min, etc.
     
-    answer = next((m for m in terms if m in text_norm), None)
+    answer = next((m for m in terms if m in text_list), None)
     if answer is not None:
         return True
     else:

@@ -260,7 +260,6 @@ def word_to_num(number_sentence):
     if clean_numbers.count('point') == 1:
         clean_decimal_numbers = clean_numbers[clean_numbers.index('point')+1:]
         clean_numbers = clean_numbers[:clean_numbers.index('point')]
-
     billion_index = clean_numbers.index('billion') if 'billion' in clean_numbers else -1
     million_index = clean_numbers.index('million') if 'million' in clean_numbers else -1
     thousand_index = clean_numbers.index('thousand') if 'thousand' in clean_numbers else -1

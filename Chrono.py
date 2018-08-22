@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', metavar='MLTrainData', type=str, help='A string representing the file name that contains the CSV file with the training data matrix.', required=False, default=False)
     parser.add_argument('-c', metavar='MLTrainClass', type=str, help='A string representing the file name that contains the known classes for the training data matrix.', required=False, default=False)
     parser.add_argument('-M', metavar='MLmodel', type=str, help='The path and file name of a pre-build ML model for loading.', required=False, default=None)
-    
+    parser.add_argument('-X', metavar='XMLOUT', type=str, help='1 if you want xml out, 0 otherwise (deafault 0)', required=False, default='0')
     args = parser.parse_args()
     ## Now we can access each argument as args.i, args.o, args.r
     print(args.i)
@@ -85,15 +85,18 @@ if __name__ == "__main__":
     ann_outfiles = []
     outdirs = []
     for root, dirs, files in os.walk(args.i, topdown = True):
-       for name in dirs:
-           indirs.append(os.path.join(root, name))
-           infiles.append(os.path.join(root,name,name))
-           ann_outfiles.append(os.path.join(args.o, "anns", name))
-           xml_outfiles.append(os.path.join(args.o, name, name))
-           outdirs.append(os.path.join(args.o,name))
-           if not os.path.exists(os.path.join(args.o,name)):
-               os.makedirs(os.path.join(args.o,name))
-    
+       for name in files:
+           if (args.x in name):
+               name=re.sub("\\"+ args.x, "", name)
+               indirs.append(os.path.join(root, name))
+               infiles.append(os.path.join(root,name))
+               ann_outfiles.append(os.path.join(args.o, "anns", name))
+               xml_outfiles.append(os.path.join(args.o, name, name))
+               outdirs.append(os.path.join(args.o,name))
+               if args.X=="1" and not os.path.exists(os.path.join(args.o,name)):
+                   os.makedirs(os.path.join(args.o,name))
+               if not os.path.exists(os.path.join(args.o, "anns")):
+                   os.makedirs(os.path.join(args.o, "anns"))
     ## Get training data for ML methods by importing pre-made boolean matrix
     ## Train ML methods on training data
     if(args.m == "DT" and args.M is None):
@@ -153,7 +156,7 @@ if __name__ == "__main__":
         chrono_ID_counter=1
 
 
-        text, tokens, spans, tags, sents = utils.getWhitespaceTokens(infiles[f] + args.x)
+        text, tokens, spans, tags, sents = utils.getWhitespaceTokens(infiles[f]+ args.x)
 
 
 
@@ -167,7 +170,7 @@ if __name__ == "__main__":
                 deb.write(chro.getFreqDebug()+"\n")
         freqPhrases = utils.getFrequencyPhrases(chroList, text)
         #dosePhrases = utils.getDosePhrases()
-        doseDurationPhrases=utils.getDoseDurationPhrases(chroList)
+        #doseDurationPhrases=utils.getDoseDurationPhrases(chroList)
         chrono_master_list, my_freq_ID_counter = BuildEntities.buildChronoList(freqPhrases,
                                                                                  chrono_ID_counter, chroList,
                                                                                  (classifier, args.m), feats)
@@ -177,5 +180,6 @@ if __name__ == "__main__":
         #                                                                     (classifier, args.m), feats))[0])
 
         print("Number of Chrono Entities: " + str(len(chrono_master_list)))
-        utils.write_xml(chrono_list=chrono_master_list, outfile=xml_outfiles[f])
+        if (args.X=='1'):
+            utils.write_xml(chrono_list=chrono_master_list, outfile=xml_outfiles[f])
         utils.write_ann(chrono_list=chrono_master_list, outfile=ann_outfiles[f])

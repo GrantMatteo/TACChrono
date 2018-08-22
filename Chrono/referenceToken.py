@@ -176,11 +176,11 @@ class refToken:
     ## Returns a string for Frequency debugging
     def getFreqDebug(self):
         return self.text + " " +str(self.frequencyTransition) + " " + str(self.temporal) +" "+ str(self.temporalType)+ " "+str(self.acronym) + " " +\
-               str(self.numericRange) + " " + str(self.numeric) + " " + str(self.freqModifier) + " " + str(self.qInterval)+ " "+ "BAD: "+str(self.doseunit or self.combdose)
+               str(self.numericRange) + " " + str(self.numeric) + " " + str(self.freqModifier) + " " + str(self.qInterval)+ " "+ "BAD: "+str(self.doseunit or self.combdose)+" " + str(self.pos) + " "+str(self.isNumericOnly())
     ## Useful for stripping away extraneous numeric words
     def isNumericOnly(self):
-        return self.numeric and not (self.temporal or \
-               self.acronym or self.numericRange or self.freqModifier or self.qInterval)
+        return (self.numeric or self.numericRange) and not (self.temporal or \
+               self.acronym or self.freqModifier or self.qInterval)
     def isFreqModifier(self):
         return self.freqModifier
     def isFreqTransition(self):

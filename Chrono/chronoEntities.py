@@ -48,6 +48,7 @@
 # @param type The type of the entity
 # @param parent_type The parent type of the entity
 import re
+import string
 class ChronoEntity:
 
     ## The constructor
@@ -157,6 +158,21 @@ class ChronoFrequencyEntity(ChronoEntity):
         self.label = label
         self.text = text
         self.span = span
+        firstNonPunct=0
+        while firstNonPunct< len(text): #remove punctuation at the beginning of the string
+            if (self.text[firstNonPunct] not in string.punctuation):
+                break
+            firstNonPunct+=1
+
+        lastNonPunct=len(self.text)-1
+        while lastNonPunct>-1: #remove punctuation at the end of the string
+            if (self.text[lastNonPunct] not in string.punctuation):
+                break
+            lastNonPunct-=1
+        self.end_span-=len(text)-1-lastNonPunct
+        self.start_span += firstNonPunct
+        self.text = self.text[firstNonPunct:lastNonPunct+1]
+        self.span=(self.start_span, self.end_span)
 
     def getText(self):
         return self.text
