@@ -6,11 +6,16 @@ resultsEvaluation/*
 resultsDebug/*
 resultsOfficialTrain/*
 data/*
+to be pasted
+.idea/*
+.idea
 .DS_Store
 *.pyc
 results
 data/Debugging
 *.ipynb
+temp/*
+temp
 .Rhistory
 gold-standard-parsing.txt
 testdata
