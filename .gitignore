@@ -6,7 +6,7 @@ resultsEvaluation/*
 resultsDebug/*
 resultsOfficialTrain/*
 data/*
-to be pasted
+to be pasted back/
 .idea/*
 .idea
 .DS_Store
@@ -32,6 +32,7 @@ venv/*
 data/*
 resultsTest
 resultsTrain
+to be pasted back
 Chrono/sutime
 data/SemEval-Task6-GUTime-TestResults
 data/SemEval-Task6-GUTime-TrainResults
