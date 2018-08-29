@@ -133,7 +133,7 @@ def getNumberFromText(text):
     try:
         number = w2n.word_to_num(text)
     except ValueError:
-        number = isOrdinal(text)
+        number = None #isOrdinal(text)
 
     return number
 

@@ -118,6 +118,7 @@ class LabelPhraseEntity:
     ## Gets the entity's tempvalue
     def getValue(self) :
         return(self.tempvalue)
+    ## Gets the entity's items
     def getItems(self):
         return self.items
 

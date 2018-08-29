@@ -39,7 +39,8 @@ from Chrono.TimePhraseToChrono import *
 from Chrono import referenceToken
 from Chrono import chronoEntities as chrono
 from Chrono import utils
-
+import re
+import string
 
 #Example TimePhrase List
 #Wsj_0152
@@ -55,7 +56,7 @@ from Chrono import utils
 # @return List of Chrono entities and the ChronoID
 from Chrono.TimePhraseToChrono import DoseDuration
 
-def buildChronoList(TimePhraseList, chrono_id, ref_list, PIclassifier, PIfeatures, ):
+def buildChronoList(TimePhraseList, chrono_id, ref_list, PIClassifier, PIStuff):
     chrono_list = []
     
     ## Do some further pre-processing on the ref token list
@@ -63,17 +64,15 @@ def buildChronoList(TimePhraseList, chrono_id, ref_list, PIclassifier, PIfeature
     ref_list = referenceToken.replacePunctuation(ref_list)
     ## Convert to lowercase
     ref_list = referenceToken.lowercase(ref_list)
-    
     for s in TimePhraseList:
         chrono_tmp_list = []
-        
         # this is the new chrono time flags so we don't duplicate effort.  Will ned to eventually re-write this flow.
         # The flags are in the order: [loneDigitYear, month, day, hour, minute, second]
 
 
         
 
-        chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
+        #chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
         chrono_tmp_list, chrono_id = buildFrequency(s, chrono_id, chrono_tmp_list, ref_list)
 
 
@@ -88,328 +87,99 @@ def buildChronoList(TimePhraseList, chrono_id, ref_list, PIclassifier, PIfeature
 #END_MODULE
 ####
 def buildFrequency(s, chrono_id, chrono_tmp_list, ref_list):
-
-    chrono_tmp_list.append(chrono.ChronoFrequencyEntity(id=str(chrono_id) + "entity", label="Frequency",span=s.getSpan(), text=s.getText()))
+    flag= hasFrequency(s)
+    flag=True
+    if (flag):
+        chrono_tmp_list.append(chrono.ChronoFrequencyEntity(id=str(chrono_id) + "entity", label="Frequency",span=s.getSpan(), text=s.getText()))
     chrono_id+=1
     return chrono_tmp_list, chrono_id
+##Checks for a variety of patterns using lists of functions; functions are organized in lists. If the chronoentities match any one of the patterns, it has Frequency.
+# @author Grant Matteo
+# @param s Time phrase to check
+# @return True if matches any of the patterns, False otherwise
+def hasFrequency(s):
+    flag=False
+    refToks=s.getItems()
+    if (hasSingular(refToks)):
+        return True
 
-## Takes in list of ChronoEntities and identifies sub-intervals within the list
-# @author Amy Olex
-# @param list of ChronoEntities
-# @return List of ChronoEntities with sub-intervals assigned
-def buildSubIntervals(chrono_list, chrono_id, dct, ref_list):
-    year = None
-    month = None
-    day = None
-    hour = None
-    minute = None
-    second = None
-    daypart = None
-    dayweek = None
-    interval = None
-    period = None
-    nth = None
-    nxt = None
-    this = None
-    tz = None
-    ampm = None
-    modifier = None
-    last = None
-    
-    entity_count = 0
-   
+    #list of functions. The phrases must match
+    dict_of_funct_lists = {
+        "<once-twice> <a-per-etc> <timeunit>": [isIn, isIn, temporalTypeCheck],
+        "<n> times <a-per-etc> <timeunit>": [isNumericOnly, isIn, isIn, temporalTypeCheck]
+
+    }
 
 
-    ## loop through all entities and pull out the approriate IDs
-    for e in range(0,len(chrono_list)):
+    # used when functions need additional input, EG: isIn() needs a list of Strings
+    dict_of_funct_inputs = {
+        "<once-twice> <a-per-etc> <timeunit>": [["once", "twice"], ["a", "per", "each", "every"], [4]],
+        "<n> times <a-per-etc> <timeunit>": [[], ["times"], ["a", "per", "each", "every"], [4]]
 
-        e_type = chrono_list[e].get_type()
-
-
-        if e_type == "Two-Digit-Year" or e_type == "Year":
-            year = e
-            entity_count = entity_count + 1
+    }
 
 
-        elif e_type == "Month-Of-Year":
-            month = e
-            entity_count = entity_count + 1
-        elif e_type == "Day-Of-Month":
-            day = e
-            entity_count = entity_count + 1
-        elif e_type == "Hour-Of-Day":
-            hour = e
-            entity_count = entity_count + 1
-        elif e_type == "Minute-Of-Hour":
-            minute = e
-            entity_count = entity_count + 1
-        elif e_type == "Second-Of-Minute":
-            second = e
-            entity_count = entity_count + 1
-        elif e_type == "Part-Of-Day":
-            daypart = e
-            entity_count = entity_count + 1
-        elif e_type == "Day-Of-Week":
-            dayweek = e
-            entity_count = entity_count + 1
-        elif e_type == "Calendar-Interval":
-            interval = e
-            entity_count = entity_count + 1
-        elif e_type == "Period":
-            period = e
-            entity_count = entity_count + 1
-        elif e_type == "NthFromStart":
-            nth = e
-            entity_count = entity_count + 1
-        elif e_type == "Next":
-            nxt = e
-            entity_count = entity_count + 1
-        elif e_type == "This":
-            this = e
-            entity_count = entity_count + 1
-        
-        elif e_type == "Time-Zone":
-            tz = e
-            entity_count = entity_count + 1
-        elif e_type == "AMPM-Of-Day":
-            ampm = e
-            entity_count = entity_count + 1
-        elif e_type == "Modifier":
-            modifier = e
-            entity_count = entity_count + 1
-        elif e_type == "Last":
-            last = e
-            entity_count = entity_count + 1
-            
-        
-        
-    ## Now add additional NEXT and LAST entities where needed
-    ## Need to edit to figure out if a modifier word exists first, then test for year, etc.
-    ## need to look specifically for modifier words in the other methods.  This method catches full dates that are next or last with no modifier words.
-    ## update: I now have a buildLast() method that identifies the modifier words.
-    if year is None:
-        if dct is not None:
-            if month is not None and this is None and nxt is None and last is None:                
-                mStart = chrono_list[month].get_start_span()
-                mEnd = chrono_list[month].get_end_span()
-                
-                my_month = utils.getMonthNumber(chrono_list[month].get_month_type())
-                
-                if day is not None and my_month == dct.month:
-                    # add a Last
-                    if chrono_list[day].get_value() <= dct.day:
-                        chrono_list.append(chrono.ChronoLastOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[month].get_id()))
-                        chrono_id = chrono_id + 1
-                    elif chrono_list[day].get_value() > dct.day:
-                        chrono_list.append(chrono.ChronoNextOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[month].get_id()))
-                        chrono_id = chrono_id + 1
-                
-                elif my_month < dct.month:
-                    chrono_list.append(chrono.ChronoLastOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[month].get_id()))
-                    chrono_id = chrono_id + 1
-                    
-                elif my_month > dct.month:
-                    chrono_list.append(chrono.ChronoNextOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[month].get_id()))
-                    chrono_id = chrono_id + 1      
-            
-            ##having a problem where a past day is being referenced without it being explicit.  
-            ##need to look at the closest preceding verb tense to see if it is past or present I think.
-            ##will need the reference list to do this.
-            if dayweek is not None and this is None and nxt is None and last is None:                
-                mStart = chrono_list[dayweek].get_start_span()
-                mEnd = chrono_list[dayweek].get_end_span()
-                
-                #Get ref idx for this token
-                ref = utils.getRefIdx(ref_list, mStart, mEnd)
-                vb = None
-                
-                while vb is None and ref != 0:
-                    if "VB" in ref_list[ref].getPos():
-                        if ref_list[ref].getPos() in ["VBD","VBN"]:
-                            #past tense so put as a last
-                            chrono_list.append(chrono.ChronoLastOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[dayweek].get_id()))
-                            chrono_id = chrono_id + 1
+    # used to keep track of where in the pattern we are
+    funct_iterators={key:0 for key in dict_of_funct_inputs}
+    # for every reference token, iterate through the patterns, trying to find matches; if each method in a list in
+    # dict_of_funct_lists returns true sequentially, the pattern matches!
+    for refTok in refToks:
+        for key, functList in dict_of_funct_lists.items():
+            position=funct_iterators[key]#where we are in this pattern
+            if (functList[position](refTok, *dict_of_funct_inputs[key][position])):
+                funct_iterators[key]+=1 #we passed this one, so iterate the position of the match
+                if funct_iterators[key]>=len(functList):
+                    if (key == ""):
+                        print("SUCCESS!", s.getText())
+                    return True #if we have progressed to the end of a pattern, we did it!
+            else:
+                funct_iterators[key]=0
 
-                        elif ref_list[ref].getPos() in ["VB","VBG","VBP","VBZ"]:
-                            #present tense so put as a next
-                            chrono_list.append(chrono.ChronoNextOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[dayweek].get_id()))
-                            chrono_id = chrono_id + 1  
-                        vb = True
+    return flag
+         ##FUNCTIONS TO BE USED IN PATTERN RECOGNITION##
+def isFreqComp(refTok):
+    if refTok.doseunit or refTok.combdose:  # don't want to capture doseunits which may precede frequencies
+        return False
+    return refTok.temporal or \
+           refTok.acronym or refTok.numericRange or refTok.numeric or refTok.freqModifier or refTok.qInterval
+#returns true if refTok's text is in the list
+def isIn(refTok, *list):
+    text_norm=re.sub('[' + string.punctuation+']', "", refTok.getText().lower().strip())
+    return text_norm in list
+def temporalTypeCheck(refTok, num):
+    return refTok.temporalType==num
+def isNumericOnly(refTok):
+    return (refTok.numeric or refTok.numericRange) and not (refTok.temporal or \
+                                                        refTok.acronym or refTok.freqModifier or refTok.qInterval)
+def isFreqModifier(refTok):
+    return refTok.freqModifier
+def isFreqTransition(refTok):
+    return refTok.frequencyTransition
+def isQInterval(refTok):
+    return refTok.qInterval
+def isAcronym(refTok):
+    return refTok.acronym
+def isNumericRange(refTok):
+    return refTok.numericRange
+def isTemporal(refTok):
+    return (refTok.temporal)
+def isDoseunit(refTok):
+    return (refTok.doseunit)
+def isNumeric(refTok):
+    return (refTok.numeric)
+def isCombdose(refTok):
+    return refTok.combdose
+def hasSingular(refToks):
+    for item in refToks:
+        if item.isQInterval() or item.isAcronym():
+            return True
 
-                    ref-=1
-                
-                '''
-                weekdays = {"Monday":0, "Tuesday":1, "Wednesday":2, "Thursday":3, "Friday":4, "Saturday":5, "Sunday":6}
-                ##Monday is 0 and Sunday is 6
-                dct_day = dct.weekday()
-                ##need convert the doctime to a day of week
-                my_dayweek = weekdays[chrono_list[dayweek].get_day_type()]
-                
-                if my_dayweek < dct_day:
-                    chrono_list.append(chrono.ChronoLastOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[dayweek].get_id()))
-                    chrono_id = chrono_id + 1
-                    print("FOUND DAYWEEK LAST")
-                    
-                elif my_dayweek > dct_day:
-                    chrono_list.append(chrono.ChronoNextOperator(entityID=str(chrono_id) + "entity", start_span=mStart, end_span=mEnd, repeating_interval=chrono_list[dayweek].get_id()))
-                    chrono_id = chrono_id + 1  
-                    print("FOUND DAYWEEK NEXT")        
-                '''
-    
-    ## Now assign all sub-intervals
-    if second is not None and minute is not None:
-        chrono_list[minute].set_sub_interval(chrono_list[second].get_id())
-    if minute is not None and hour is not None:
+    texts = [re.sub("[" + string.punctuation + "]", "", item.getText().lower()) for item in refToks]
 
-        chrono_list[hour].set_sub_interval(chrono_list[minute].get_id())
-    if hour is not None and day is not None:
-        chrono_list[day].set_sub_interval(chrono_list[hour].get_id())
-    if day is not None and month is not None:
-        chrono_list[month].set_sub_interval(chrono_list[day].get_id())
-    if month is not None and year is not None:
-        chrono_list[year].set_sub_interval(chrono_list[month].get_id())
-    if dayweek is not None and hour is not None:
-        chrono_list[dayweek].set_sub_interval(chrono_list[hour].get_id())
-    if dayweek is not None and daypart is not None and hour is None:
-        chrono_list[dayweek].set_sub_interval(chrono_list[daypart].get_id())
-    if day is not None and daypart is not None and hour is None:
-        chrono_list[day].set_sub_interval(chrono_list[daypart].get_id())
-    if nth is not None and period is not None:
+    text_norm = "".join(texts).strip()
 
-
-        chrono_list[nth].set_period(chrono_list[period].get_id())
-    elif nth is not None and interval is not None:
-
-        chrono_list[nth].set_repeating_interval(chrono_list[interval].get_id())
-    
-    
-    ## Test to see if we have a Last entity AND the entity count is only 1
-    ## If yes, then remove the Last entity
-    ## Current not implementing this, but may need to add it in the future.  This removal of entities reduced our recall by half
-#    if last is not None and entity_count == 1:
-#        print("Found a Last without a temporal entity")
-#        del chrono_list[last]
-        
-    reindex = False
-    if ampm is not None and hour is not None:
-        chrono_list[hour].set_ampm(chrono_list[ampm].get_id())
-    elif ampm is not None and hour is None:
-        # Delete the AMPM entity if no hour associated with it.
-
-        del chrono_list[ampm]
-        reindex = True
-
-    ## I know I need to reindex here, but I honestly forgot exactly why.
-    if reindex:
-        for e in range(0,len(chrono_list)):
-
-
-            e_type = chrono_list[e].get_type()
-            if e_type == "Time-Zone":
-                tz = e
-                    
-        
-    if tz is not None and hour is not None:
-        chrono_list[hour].set_time_zone(chrono_list[tz].get_id())
-    elif tz is not None and hour is None:
-        # Delete the tz entity if there is no hour to link it to.  Not sure if this will work for all cases.
-        del chrono_list[tz]
-
-    # Link modifiers
-    if modifier is not None and period is not None:
-        chrono_list[period].set_modifier(chrono_list[modifier].get_id())
-    elif modifier is not None and interval is not None:
-        chrono_list[interval].set_modifier(chrono_list[modifier].get_id())
-    elif modifier is not None and period is None and interval is None:
-        # Delete the modifier entity if there is no period or interval to link it to.  Not sure if this will work for all cases.
-        del chrono_list[modifier]
-    
-    
-    ##### Notes: This next bit is complicated.  If I include it I remove some False Positives, but I also create some False Negatives.
-    ##### I think more complex parsing is needed here to figure out if the ordinal is an NthFromStart or not.  
-    ##### I think implementing a machine learning method here may help.
-    #elif nth is not None:
-        # if the nthFromStart does not have a corresponding interval we should remove it from the list.
-
-        #del chrono_list[nth]
-    
-    return chrono_list, chrono_id
-
-####
-#END_MODULE
-####
-
-### UNUSED ###
-## Parses a TimePhrase entity's text field to determine if it contains a part of the day expression, then builds the associated chronoentity list
-# @author Nicholas Morton
-# @param s The TimePhrase entity to parse 
-# @param chronoID The current chronoID to increment as new chronoentities are added to list.
-# @param chronoList The list of chrono objects we currently have.  Will add to these.
-# @return TimePhrase Duration Entity
-# def buildDuration(s, chrono_id, chrono_list):
-#
-#     #if hasExactDuration(s):  #3 days -> P3D
-#
-#     #if hasInExactDuration(s): #a few years -> PXY
-#
-#     #if hasDurationRange(s): #2 to 3 months -> P2M/P3M
-#
-#     return chrono_list, chrono_id
-#
-# ####
-#END_MODULE
-#### 
-
-
-### UNUSED ###
-## Parses a TimePhrase entity's text field to determine if it contains a part of the day expression, then builds the associated chronoentity list
-# @author Nicholas Morton
-# @param s The TimePhrase entity to parse 
-# @param chronoID The current chronoID to increment as new chronoentities are added to list.
-# @param chronoList The list of chrono objects we currently have.  Will add to these.
-# @return TimePhrase Set Entity
-# def buildSet(s, chrono_id, chrono_list):
-#
-#     return chrono_list, chrono_id
-
-
-
-# @author Amy Olex
-# @param tpentity The TimePhrase entity object being parsed
-# @return Outputs 4 values: Boolean Flag
-# def hasExactDuration(tpentity):
-#
-#     if "P#D":
-#         return True
-#     else:
-#         return False
-
-
-###  UNUSED    #############
-## Takes in a single text string and identifies if it has a hh:mm:ss
-# @author Nicholas Morton
-# @param tpentity The TimePhrase entity object being parsed
-# @return Outputs 4 values: Boolean Flag, Value text, start index, end index
-# def hasTimeString(tpentity):
-#     text_lower = tpentity.getText().lower()
-#     # remove all punctuation
-#     text_norm = text_lower.translate(str.maketrans("", "", ","))
-#     # convert to list
-#     text_list = text_norm.split(" ")
-#
-#     if len(text_list) > 0:
-#         # loop through list looking for expression
-#         for text in text_list:
-#             # define regular expression to find a numeric hour
-#             if (re.search('^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$', text)):  # checks for HH:MM:SS String
-#                 if len(text.split(":")) == 3:
-#                     start_idx, end_idx = getSpan(text_norm, re.compile(":").split(text)[0])
-#                     return True, text, start_idx, end_idx
-#
-#                 else:
-#                     return False, None, None, None  # if no 2 digit hour expressions were found return false
-#
-#         return False, None, None, None  # if no 2 digit hour expressions were found return false
-#     else:
-#
-#         return False, None, None, None  # if the text_list does not have any entries, return false
+    singulars = ["daily", "nightly", "tuthsa", "mowefr", "qmowefr", "qtuthsa", "bedtime",
+                 "qmonth", "qday", "once", "ongoing", "noon"]
+    # find if the texts has any singulars in it
+    return text_norm in singulars or re.search("\d+xweek", text_norm)  # check for 4xweek, etc
+        ##END OF FUNCTIONS TO BE USED IN PATTERN RECOGNITION##

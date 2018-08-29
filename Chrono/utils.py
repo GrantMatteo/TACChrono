@@ -144,7 +144,9 @@ def getNumberFromText(text):
     try:
         number = w2n.word_to_num(text)
     except ValueError:
-        number = None  # isOrdinal(text) This never occurs in Frequencies
+        number = None
+    number= None if isOrdinal(text) is not None else number# This never occurs in Frequencies
+
     return number
 
 
@@ -478,7 +480,7 @@ def isAcronym(tok):
 
 
 def isFreqModifier(tok):
-    modifiers = ["once", "twice", "each", "every", "daily", "nightly", "at", "as", "ongoing", "needed", "wmeals",
+    modifiers = ["once", "twice", "each", "every", "daily", "nightly", "at", "as", "ongoing", "needed", "wmeals", "with", "w"
                  "meals"]
     tok = re.sub('[' + string.punctuation + ']', '', tok).strip()
     tok = tok.lower()
@@ -487,7 +489,7 @@ def isFreqModifier(tok):
 
 ##These should only show up in the middle of a Frequency phrase, otherwise, something is wrong.
 def isFreqTransition(tok):
-    modifiers = ["if", "times", "time", "per", "a", "w", "and", "with"]
+    modifiers = ["if", "times", "time", "per", "a", "and"]
     tok = re.sub('[' + string.punctuation + ']', '', tok).strip()
     tok = tok.lower()
     return tok in modifiers
@@ -597,18 +599,20 @@ def combdoseTest(tok):  # may have to fix later
 # @param tok The token string
 # @return Boolean true if numeric, false otherwise
 def numericTest(tok, pos):
+
     if re.search("\d:[0-5]\d", tok) is not None:
         return False
     # Times are not numeric
     if "[" in tok.lower() and "]" in tok.lower():
         return False
-    if pos == "CD":
+    tok = tok.translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation))).strip()
+    tok = re.sub("–", "", tok)
+    tok = re.sub(" ", "", tok)
+    if pos == "CD" and not isOrdinal(tok):
         return True
     else:
         # remove punctuation
-        tok = tok.translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation))).strip()
-        tok = re.sub("–", "", tok)
-        tok = re.sub(" ", "", tok)
+
         # test for a number
         # tok.strip(",.")
         val = getNumberFromText(tok)
@@ -674,8 +678,8 @@ def temporalTest(tok):
     #    return True, 7
     if tt.hasPartOfDay(tok):
         return True, 8
-    if tt.hasTimeZone(tok):
-        return True, 9
+    #if tt.hasTimeZone(tok):
+    #    return True, 9
     # if tt.hasTempText(tok):
     #    return True, 10
     # not useful to us
@@ -925,7 +929,7 @@ def trimExcess(items):
         hasIllegalParts = False
         hasIllegalParts = [True for partial in illegalPartials if
                            re.search(partial, normalizedText)]  # if any of them match
-        hasIllegalParts= hasIllegalParts or normalizedTextUpper=="HR"
+        hasIllegalParts= hasIllegalParts or normalizedTextUpper=="HR" #HR means HeartRate
         if normalizedText in nonQillegals:
             if (n == 0 or re.sub('[' + string.punctuation + ']', '', items[n - 1].getText()).lower().strip() != "q"):
                 if n < len(items) / 2:  # get rid of the part before/after the illegal word, whichever is smaller.
@@ -1015,9 +1019,10 @@ def isValidFreqPhrase(items):
                 return True
 
         texts = [re.sub("[" + string.punctuation + "]", "", item.getText().lower()) for item in items]
-        text_norm = "".join(texts)
 
-        singulars = ["daily", "nightly", "tuthsa", "mowefr" "qmowefr", "qtuthsa", "bedtime",
+        text_norm = "".join(texts).strip()
+
+        singulars = ["daily", "nightly", "tuthsa", "mowefr", "qmowefr", "qtuthsa", "bedtime",
                      "qmonth", "qday", "once", "ongoing", "noon"]
         # find if the texts has any singulars in it
         return text_norm in singulars or re.search("\d+xweek", text_norm) #check for 4xweek, etc
