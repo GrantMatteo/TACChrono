@@ -48,6 +48,7 @@ from Chrono import DosePhraseEntity as dp
 from Chrono import LabelPhraseEntity as tp
 import re
 import csv
+from Chrono import referenceToken
 from collections import OrderedDict
 import numpy as np
 import spacy
@@ -82,12 +83,47 @@ def getWhitespaceTokens(file_path):
 
     return text, tokenized_text, spans, tags, sent_boundaries
 
-
-## Reads in the dct file and converts it to a datetime object.
-# @author Amy Olex
-# @param file_path The path and file name of the dct file.
-# @return A datetime object
-
+## Does some processing that is necessary before constructing entities
+# @author Grant Matteo
+# @param phraseList the list of freqPhrases
+# @return the modified list
+def preProcessPhrases(phraseList):
+    #combine "4 to 3" into one refTok for easier recognition
+    for phrase in phraseList:
+        tokList=phrase.getItems()
+        n=1
+        while n <len(tokList)-1:
+            cleanText=re.sub("["+string.punctuation+"]", "", tokList[n].getText()).lower().strip()
+            if (tokList[n-1].isNumericOnly() and cleanText=="to" and tokList[n+1].isNumericOnly()):
+                fullText=tokList[n-1].getText()+" "+tokList[n].getText()+" " +tokList[n+1].getText()
+                fullSpan= [tokList[n-1].getSpan()[0], tokList[n+1].getSpan()[1]]
+                tokList[n]=referenceToken.refToken(id=tokList[n-1].getID(), text=fullText, start_span=fullSpan[0], end_span=fullSpan[1], pos=tokList[n-1].getPos(),
+                             temporal=False)
+                tokList[n].setNumericRange(True)
+                tokList.pop(n-1)
+                tokList.pop(n+1)
+                n-=1
+                print("New entity",fullText, fullSpan)
+            n+=1
+        phrase.setItems(tokList)
+    #combine "four (4)" into one numeric refTok
+    for phrase in phraseList:
+        tokList=phrase.getItems()
+        n=0
+        while n <len(tokList)-1:
+            cleanText=re.sub("["+string.punctuation+"]", "", tokList[n].getText()).lower().strip()
+            if (cleanText in w2n.american_number_system.keys() and tokList[n+1].isNumeric()
+                    and re.search("\(\d+\)", tokList[n+1].getText())):
+                fullText=tokList[n].getText()+" " +tokList[n+1].getText()
+                fullSpan= [tokList[n].getSpan()[0], tokList[n+1].getSpan()[1]]
+                tokList[n]=referenceToken.refToken(id=tokList[n].getID(), text=fullText, start_span=fullSpan[0], end_span=fullSpan[1], pos=tokList[n].getPos(),
+                             temporal=False)
+                tokList[n].setNumeric(True)
+                tokList.pop(n+1)
+                n-=1
+                print("New num entity",fullText, fullSpan)
+            n+=1
+        phrase.setItems(tokList)
 ## Writes out the full XML file for all T6entities in list.
 # @author Amy Olex
 # @param chrono_list The list of Chrono objects needed to be written in the file.
@@ -672,7 +708,7 @@ def temporalTest(tok):
         return True, 4
     if tt.hasAMPM(tok):
         return True, 5
-    # if tt.hasPartOfWeek(tok):
+    #if tt.hasPartOfWeek(tok):
     #    return True, 6
     # if tt.hasSeasonOfYear(tok):
     #    return True, 7
@@ -1018,7 +1054,7 @@ def isValidFreqPhrase(items):
             if item.isQInterval() or item.isAcronym():
                 return True
 
-        texts = [re.sub("[" + string.punctuation + "]", "", item.getText().lower()) for item in items]
+        texts = [re.sub("[" + string.punctuation + "]", "", item.getText().lower().strip()) for item in items]
 
         text_norm = "".join(texts).strip()
 

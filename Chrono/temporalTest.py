@@ -335,7 +335,7 @@ def hasPartOfDay(text):
     text_list = text_norm.split(" ")
     
     #define my part of day lists
-    partofday = ["morning","breakfast","lunch", "dinner", "evening","afternoon","night","nights","mornings","evening","afternoons","noon","bedtime", "meals"]
+    partofday = ["morning","breakfast","lunch", "dinner", "evening","afternoon","night","nights","mornings","evenings","afternoons","noon","bedtime", "meals"]
     
     for t in text_list:
         answer = next((m for m in partofday if m in t), None)

@@ -172,15 +172,12 @@ if __name__ == "__main__":
         except:
             print("Debug Output to /home/garnt/Documents failed")
         freqPhrases = utils.getFrequencyPhrases(chroList, text)
-        #dosePhrases = utils.getDosePhrases()
-        #doseDurationPhrases=utils.getDoseDurationPhrases(chroList)
+
+        chrono_master_list = utils.preProcessPhrases(freqPhrases)
         chrono_master_list, my_freq_ID_counter = BuildEntities.buildChronoList(freqPhrases,
                                                                                  chrono_ID_counter, chroList,
                                                                                  (classifier, args.m), feats)
 
-        #chrono_master_list.append((BuildEntities.buildChronoList(doseDurationPhrases,
-        #                                                                     chrono_ID_counter, chroList,
-        #                                                                     (classifier, args.m), feats))[0])
 
         print("Number of Chrono Entities: " + str(len(chrono_master_list)))
         if (args.X=='1'):

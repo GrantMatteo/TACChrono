@@ -72,7 +72,9 @@ class LabelPhraseEntity:
     #  @param id The ID to set it to
     def setID(self, id):
         self.id = id
-
+    ## Sets the entity's composite refToks
+    def setItems(self, list):
+        self.items=list
     ## Sets the entity's text
     #  @param text The text to set it to
     def setText(self, text):
@@ -118,7 +120,7 @@ class LabelPhraseEntity:
     ## Gets the entity's tempvalue
     def getValue(self) :
         return(self.tempvalue)
-    ## Gets the entity's items
+    ## Gets the entity's composite refToks
     def getItems(self):
         return self.items
 

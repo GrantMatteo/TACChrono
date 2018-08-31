@@ -106,15 +106,36 @@ def hasFrequency(s):
     #list of functions. The phrases must match
     dict_of_funct_lists = {
         "<once-twice> <a-per-etc> <timeunit>": [isIn, isIn, temporalTypeCheck],
-        "<n> times <a-per-etc> <timeunit>": [isNumericOnly, isIn, isIn, temporalTypeCheck]
-
+        "<n> times <a-per-etc> <timeunit>": [isNumericOnly, isIn, isIn, temporalTypeCheck],
+        "every <n> <timeunit>": [isIn, isNumericOnly, temporalTypeCheck],
+        "as <needed, directed>": [isIn, isIn],
+        "at <time of day>": [isIn, temporalTypeCheck],
+        "at <hour>": [isIn, timeTestStrong],
+        "at <n> <AM-PM>": [isIn, timeTestWeak, temporalTypeCheck],
+        "q <n> <timeunit>": [isIn, isNumericOnly, temporalTypeCheck],
+        "q <timeunit>": [isIn, temporalTypeCheck],
+        "every other <timeunit>": [isIn, isIn, temporalTypeCheck]
     }
 
+    #"morning","breakfast","lunch", "dinner", "evening","afternoon","night","nights",
+    # "mornings","evenings","afternoons","noon","bedtime", "meals"]
+    # hasDayOfWeek(tok):3
+    # hasPeriodInterval(tok): 4
+    # hasAMPM(tok): 5
+    # hasPartOfDay(tok): 8
 
     # used when functions need additional input, EG: isIn() needs a list of Strings
     dict_of_funct_inputs = {
         "<once-twice> <a-per-etc> <timeunit>": [["once", "twice"], ["a", "per", "each", "every"], [4]],
-        "<n> times <a-per-etc> <timeunit>": [[], ["times"], ["a", "per", "each", "every"], [4]]
+        "<n> times <a-per-etc> <timeunit>": [[], ["times"], ["a", "per", "each", "every"], [4]],
+        "every <n> <timeunit>": [["every"], [], [4]],
+        "as <needed, directed>": [["as"], ["needed", "directed"]],
+        "at <time of day>": [["at"], [4]],
+        "at <hour>": [["at"], []],
+        "at <n> <AM-PM>": [["at"], [], [5]],
+        "q <n> <timeunit>": [["q"], [], [4]],
+        "q <timeunit>": [["q"], [4]],
+        "every other <timeunit>": [["every"], ["other"], [4]]
 
     }
 
@@ -146,8 +167,17 @@ def isFreqComp(refTok):
 def isIn(refTok, *list):
     text_norm=re.sub('[' + string.punctuation+']', "", refTok.getText().lower().strip())
     return text_norm in list
-def temporalTypeCheck(refTok, num):
-    return refTok.temporalType==num
+def temporalTypeCheck(refTok, *nums):
+    return refTok.temporalType in nums
+def timeTestStrong(refTok):
+    result=re.search("^\d{1,2}\:\d{1,2}$", refTok.getText().strip())
+    return result is not None
+def timeTestWeak(refTok):
+    result = re.search("^\d{1,2}\:\d{1,2}$", refTok.getText().strip())
+
+    if result is None:
+        result =re.search("^\d$", refTok.getText().strip())
+    return result is not None
 def isNumericOnly(refTok):
     return (refTok.numeric or refTok.numericRange) and not (refTok.temporal or \
                                                         refTok.acronym or refTok.freqModifier or refTok.qInterval)
@@ -174,12 +204,11 @@ def hasSingular(refToks):
         if item.isQInterval() or item.isAcronym():
             return True
 
-    texts = [re.sub("[" + string.punctuation + "]", "", item.getText().lower()) for item in refToks]
+    texts = [re.sub("[" + string.punctuation + "]", "", item.getText().lower().strip()) for item in refToks]
 
     text_norm = "".join(texts).strip()
 
     singulars = ["daily", "nightly", "tuthsa", "mowefr", "qmowefr", "qtuthsa", "bedtime",
-                 "qmonth", "qday", "once", "ongoing", "noon"]
-    # find if the texts has any singulars in it
+                 "qmonth", "qday", "once", "ongoing", "noon"]    # find if the texts has any singulars in it
     return text_norm in singulars or re.search("\d+xweek", text_norm)  # check for 4xweek, etc
         ##END OF FUNCTIONS TO BE USED IN PATTERN RECOGNITION##
