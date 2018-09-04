@@ -41,7 +41,7 @@ import os
 import pickle
 import spacy
 import re
-
+from chronoML import FrequencyRNN as rnn
 from chronoML import DecisionTree as DTree
 from chronoML import RF_classifier as RandomForest
 from chronoML import NB_nltk_classifier as NBclass, ChronoKeras
@@ -51,6 +51,7 @@ from Chrono import BuildEntities
 # from Chrono import TimePhrase_to_Chrono
 from Chrono import referenceToken
 from Chrono import utils
+import keras
 from keras.models import load_model
 
 
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument('-i', metavar='inputdir', type=str, help='path to the input directory.', required=True)
     parser.add_argument('-x', metavar='fileExt', type=str, help='input file extension if exists. Default is and empty string', required=False, default="")
     parser.add_argument('-o', metavar='outputdir', type=str, help='path to the output directory.', required=True)
-    parser.add_argument('-m', metavar='MLmethod', type=str, help='The machine learning method to use. Must be one of NN (neural network), DT (decision tree), SVM (support vector machine), NB (naive bayes, default).', required=False, default='NB')
+    parser.add_argument('-m', metavar='useML', type=str, help='Whether to use ML classification (1) or not (0) (default 0)', required=False, default='0')
     parser.add_argument('-w', metavar='windowSize', type=str, help='An integer representing the window size for context feature extraction. Default is 3.', required=False, default=3)
     parser.add_argument('-d', metavar='MLTrainData', type=str, help='A string representing the file name that contains the CSV file with the training data matrix.', required=False, default=False)
     parser.add_argument('-c', metavar='MLTrainClass', type=str, help='A string representing the file name that contains the known classes for the training data matrix.', required=False, default=False)
@@ -84,6 +85,7 @@ if __name__ == "__main__":
     xml_outfiles = []
     ann_outfiles = []
     outdirs = []
+
     for root, dirs, files in os.walk(args.i, topdown = True):
        for name in files:
            if (args.x in name):
@@ -99,56 +101,11 @@ if __name__ == "__main__":
                    os.makedirs(os.path.join(args.o, "anns"))
     ## Get training data for ML methods by importing pre-made boolean matrix
     ## Train ML methods on training data
-    if(args.m == "DT" and args.M is None):
-        ## Train the decision tree classifier and save in the classifier variable
 
-        classifier, feats = DTree.build_dt_model(args.d, args.c)
-        with open('DT_model.pkl', 'wb') as mod:  
-            pickle.dump([classifier, feats], mod)
 
-    if(args.m == "RF" and args.M is None):
-        ## Train the decision tree classifier and save in the classifier variable
-
-        classifier, feats = RandomForest.build_model(args.d, args.c)
-        with open('RF_model.pkl', 'wb') as mod:
-            pickle.dump([classifier, feats], mod)
-    
-    elif(args.m == "NN" and args.M is None):
-
-        ## Train the neural network classifier and save in the classifier variable
-        classifier = ChronoKeras.build_model(args.d, args.c)
-        feats = utils.get_features(args.d)
-        classifier.save('NN_model.h5')
-            
-    elif(args.m == "SVM" and args.M is None):
-
-        ## Train the SVM classifier and save in the classifier variable
-        classifier, feats = SVMclass.build_model(args.d, args.c)
-        with open('SVM_model.pkl', 'wb') as mod:  
-            pickle.dump([classifier, feats], mod)
-            
-    elif(args.M is None):
-
-        ## Train the naive bayes classifier and save in the classifier variable
-        classifier, feats, NB_input = NBclass.build_model(args.d, args.c)
-        classifier.show_most_informative_features(20)
-        with open('NB_model.pkl', 'wb') as mod:  
-            pickle.dump([classifier, feats], mod)
-                
-    elif(args.M is not None):
-
-        if args.m == "NB" or args.m == "DT":
-            with open(args.M, 'rb') as mod:
-                print(args.M)
-                classifier, feats = pickle.load(mod)
-        elif args.m == "NN":
-            classifier = load_model(args.M)
-            feats = utils.get_features(args.d)
-    
-    ## Pass the ML classifier through to the parse SUTime entities method.
-  
-    ## Loop through each file and parse
-
+    classifier=keras.models.load_model(args.M)
+    xTotal=[]
+    yTotal=[]
     for f in range(0,len(infiles)) :
         print("Parsing "+ infiles[f] +" ...")
         ## Init the ChronoEntity list
@@ -170,16 +127,30 @@ if __name__ == "__main__":
                 for chro in chroList:
                     deb.write(chro.getFreqDebug()+"\n")
         except:
-            print("Debug Output to /home/garnt/Documents failed")
+            print("Debug Output to /home/garnt/Documents failed in Chrono.py")
         freqPhrases = utils.getFrequencyPhrases(chroList, text)
 
-        chrono_master_list = utils.preProcessPhrases(freqPhrases)
-        chrono_master_list, my_freq_ID_counter = BuildEntities.buildChronoList(freqPhrases,
-                                                                                 chrono_ID_counter, chroList,
-                                                                                 (classifier, args.m), feats)
-
-
+        freqPhrases = utils.preProcessPhrases(freqPhrases)
+        nnYList, nnXList = BuildEntities.getMLFeats(freqPhrases, infiles[f]+".ann")
+        for x, y in zip(nnXList, nnYList):
+            xTotal.append(x)
+            yTotal.append(y)
+        
+        chrono_master_list=[]
+        if (args.m=='1'):
+            if (len(nnXList)>0):
+                chrono_master_list, my_freq_ID_counter =BuildEntities.buildChronoListML(TimePhraseList=freqPhrases, chrono_id=chrono_ID_counter, ref_list= chroList, X=nnXList, classifier=classifier)
+            else:
+                print("skipped")
+        else:
+            chrono_master_list, my_freq_ID_counter = BuildEntities.buildChronoList(freqPhrases,
+                                                                             chrono_ID_counter, chroList)
+        
         print("Number of Chrono Entities: " + str(len(chrono_master_list)))
         if (args.X=='1'):
             utils.write_xml(chrono_list=chrono_master_list, outfile=xml_outfiles[f])
         utils.write_ann(chrono_list=chrono_master_list, outfile=ann_outfiles[f])
+        """
+    classifier=rnn.build_model(xTotal, yTotal)
+    classifier.save("/home/garnt/Documents/Models/2.pkl")
+        """

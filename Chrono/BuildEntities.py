@@ -40,6 +40,7 @@ from Chrono import referenceToken
 from Chrono import chronoEntities as chrono
 from Chrono import utils
 import re
+from chronoML import FrequencyRNN as rnn
 import string
 
 #Example TimePhrase List
@@ -56,9 +57,9 @@ import string
 # @return List of Chrono entities and the ChronoID
 from Chrono.TimePhraseToChrono import DoseDuration
 
-def buildChronoList(TimePhraseList, chrono_id, ref_list, PIClassifier, PIStuff):
+def buildChronoList(TimePhraseList, chrono_id, ref_list):
     chrono_list = []
-    
+
     ## Do some further pre-processing on the ref token list
     ## Replace all punctuation with spaces
     ref_list = referenceToken.replacePunctuation(ref_list)
@@ -70,29 +71,126 @@ def buildChronoList(TimePhraseList, chrono_id, ref_list, PIClassifier, PIStuff):
         # The flags are in the order: [loneDigitYear, month, day, hour, minute, second]
 
 
-        
+
 
         #chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
-        chrono_tmp_list, chrono_id = buildFrequency(s, chrono_id, chrono_tmp_list, ref_list)
-
-
-        # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
+        chrono_tmp_list, chrono_id, nnPhrase = buildFrequency(s, chrono_id, chrono_tmp_list, ref_list)
         chrono_list = chrono_list+chrono_tmp_list
         chrono_tmp_list=[]
+        # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
 
-      
+
     return chrono_list, chrono_id
-    
+
+def buildChronoListML(TimePhraseList, chrono_id, ref_list, X, classifier):
+    chrono_list = []
+
+    ## Do some further pre-processing on the ref token list
+    ## Replace all punctuation with spaces
+    ref_list = referenceToken.replacePunctuation(ref_list)
+    ## Convert to lowercase
+    ref_list = referenceToken.lowercase(ref_list)
+    for s, x in zip(TimePhraseList, X):
+        chrono_tmp_list = []
+        # this is the new chrono time flags so we don't duplicate effort.  Will ned to eventually re-write this flow.
+        # The flags are in the order: [loneDigitYear, month, day, hour, minute, second]
+
+
+
+        #chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
+        chrono_tmp_list, chrono_id = buildFrequencyML(s, chrono_id, chrono_tmp_list, x, classifier)
+        chrono_list = chrono_list+chrono_tmp_list
+        chrono_tmp_list=[]
+        # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
+
+    return chrono_list, chrono_id
+def getMLFeats(TimePhraseList, currentFile):
+    frequencySpans = []
+    with open(currentFile, "r") as annFile:
+        anns = annFile.readlines()
+    for ann in anns:
+        if "Frequency" in ann:
+            while re.search("\d+;\d+", ann) is not None:
+                ann = re.sub(" \d+;\d+ ", " ", ann)
+            match = re.search("^T\d+\tFrequency (?P<start>\d+)\ (?P<end>\d+)", ann)
+            if match is not None:
+                frequencySpans.append([match.group('start'), match.group('end')])
+    nnXList = []  # a 3d vector of features for all phrases
+    nnYList = []
+    for s in TimePhraseList:
+        # this is the new chrono time flags so we don't duplicate effort.  Will ned to eventually re-write this flow.
+        # The flags are in the order: [loneDigitYear, month, day, hour, minute, second]
+
+        # chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
+        nnPhrase = getNN(s)
+        if hasSingular(s.getItems()):
+            continue
+        gennedStart = s.getSpan()[0]
+        gennedEnd = s.getSpan()[1]
+        isReal = False
+        for span in frequencySpans:
+            goldStart = int(span[0])
+            goldEnd = int(span[1])
+            if (gennedStart < goldStart and gennedEnd > goldEnd) or \
+                    (abs(gennedStart - goldStart) < 6 and abs(gennedEnd - goldEnd) < 6):
+                isReal = True
+        nnYList.append(isReal)
+        nnXList.append(nnPhrase)
+        # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
+        chrono_tmp_list = []
+    return nnYList, nnXList
+
+
 ####
 #END_MODULE
 ####
 def buildFrequency(s, chrono_id, chrono_tmp_list, ref_list):
     flag= hasFrequency(s)
-    flag=True
+    #print([chroE.getText() for chroE in s.getItems()])
+    #flag=True
+
     if (flag):
         chrono_tmp_list.append(chrono.ChronoFrequencyEntity(id=str(chrono_id) + "entity", label="Frequency",span=s.getSpan(), text=s.getText()))
     chrono_id+=1
     return chrono_tmp_list, chrono_id
+def buildFrequencyML(s, chrono_id, chrono_tmp_list, x, classifier):
+    flag= rnn.classify(classifier, x) or hasSingular(s.getItems())
+    if (flag):
+        chrono_tmp_list.append(chrono.ChronoFrequencyEntity(id=str(chrono_id) + "entity", label="Frequency",span=s.getSpan(), text=s.getText()))
+    chrono_id+=1
+    return chrono_tmp_list, chrono_id
+def getNN(s):
+    thisPhrase=[]
+    for refTok in s.getItems():
+        thisPhrase.append([
+            isIn(refTok, "once", "twice"),
+            isIn(refTok, "per", "each", "every"),
+            isIn(refTok, "times"),
+            isIn(refTok, "a"),
+            isIn(refTok, "as"),
+            isIn(refTok, "needed", "directed"),
+            isIn(refTok, "at"),
+            isIn(refTok, "q"),
+            isIn(refTok, "other"),
+            isIn(refTok, "other"),
+            isIn(refTok, "with"),
+            isIn(refTok, "meals"),
+            isIn(refTok, "weekly"),
+            isIn(refTok, "breakfast", "lunch", "dinner"),
+            isIn(refTok, "only"),
+            isIn(refTok, "if"),
+            isIn(refTok, "necessary"),
+            isIn(refTok, "period"),
+            isIn(refTok, "on"),
+            isNumericOnly(refTok),
+            temporalTypeCheck(refTok, 4),
+            temporalTypeCheck(refTok, 5),
+            temporalTypeCheck(refTok, 8),
+            timeTestStrong(refTok),
+            timeTestWeak(refTok),
+        ])
+    return thisPhrase
+
 ##Checks for a variety of patterns using lists of functions; functions are organized in lists. If the chronoentities match any one of the patterns, it has Frequency.
 # @author Grant Matteo
 # @param s Time phrase to check
@@ -112,17 +210,20 @@ def hasFrequency(s):
         "at <time of day>": [isIn, temporalTypeCheck],
         "at <hour>": [isIn, timeTestStrong],
         "at <n> <AM-PM>": [isIn, timeTestWeak, temporalTypeCheck],
-        "q <n> <timeunit>": [isIn, isNumericOnly, temporalTypeCheck],
+        "q <n> (<timeunit>?)": [isIn, isNumericOnly],
         "q <timeunit>": [isIn, temporalTypeCheck],
-        "every other <timeunit>": [isIn, isIn, temporalTypeCheck]
+        "every other <timeunit>": [isIn, isIn, temporalTypeCheck],
+        "every <timeunit>": [isIn, temporalTypeCheck],
+        "<n> times <daily-weekly>": [isNumericOnly, isIn, isIn],
+        "with meals": [isIn, isIn],
+        "<n> <a-per-each-every> <timeunit>": [isNumericOnly, isIn, temporalTypeCheck],
+        "breakfast lunch dinner": [isIn, isIn, isIn],
+        "only if necessary": [isIn, isIn],
+        "<n> <timeunit> on": [isNumericOnly, isIn, isIn],
+        "<n> <timeunit> period": [isNumericOnly, temporalTypeCheck, isIn]
+
     }
 
-    #"morning","breakfast","lunch", "dinner", "evening","afternoon","night","nights",
-    # "mornings","evenings","afternoons","noon","bedtime", "meals"]
-    # hasDayOfWeek(tok):3
-    # hasPeriodInterval(tok): 4
-    # hasAMPM(tok): 5
-    # hasPartOfDay(tok): 8
 
     # used when functions need additional input, EG: isIn() needs a list of Strings
     dict_of_funct_inputs = {
@@ -130,13 +231,20 @@ def hasFrequency(s):
         "<n> times <a-per-etc> <timeunit>": [[], ["times"], ["a", "per", "each", "every"], [4]],
         "every <n> <timeunit>": [["every"], [], [4]],
         "as <needed, directed>": [["as"], ["needed", "directed"]],
-        "at <time of day>": [["at"], [4]],
+        "at <time of day>": [["at"], [4, 8]],
         "at <hour>": [["at"], []],
         "at <n> <AM-PM>": [["at"], [], [5]],
-        "q <n> <timeunit>": [["q"], [], [4]],
-        "q <timeunit>": [["q"], [4]],
-        "every other <timeunit>": [["every"], ["other"], [4]]
-
+        "q <n> (<timeunit>?)": [["q"], []],
+        "q <timeunit>": [["q"], [4,8]],
+        "every other <timeunit>": [["every"], ["other"], [4,8]],
+        "every <timeunit>": [["each", "every"], [4, 8]],
+        "<n> times <daily-weekly>": [[], ["times"], ["daily", "weekly"]],
+        "with meals": [["with"], ["meals"]],
+        "<n> <a-per-each-every> <timeunit>": [[], ["a", "per", "each", "every"], [4]],
+        "breakfast lunch dinner": [["breakfast"], ["lunch"], ["dinner"]],
+        "only if necessary": [["if"], ["necessary"]],
+        "<n> <timeunit> on": [[], ["day", "week", "month", "hour", "days", "weeks", "months","hours","hr", "hrs"], ["on"]],
+        "<n> <timeunit> period": [[], [4], ["period"]]
     }
 
 
@@ -199,7 +307,7 @@ def isNumeric(refTok):
     return (refTok.numeric)
 def isCombdose(refTok):
     return refTok.combdose
-def hasSingular(refToks):
+def hasSingular(refToks): #this defines things that, if the phrase contains, we can safely assume it is a Frequency
     for item in refToks:
         if item.isQInterval() or item.isAcronym():
             return True
@@ -209,6 +317,7 @@ def hasSingular(refToks):
     text_norm = "".join(texts).strip()
 
     singulars = ["daily", "nightly", "tuthsa", "mowefr", "qmowefr", "qtuthsa", "bedtime",
-                 "qmonth", "qday", "once", "ongoing", "noon"]    # find if the texts has any singulars in it
-    return text_norm in singulars or re.search("\d+xweek", text_norm)  # check for 4xweek, etc
+                 "qmonth", "qday", "once", "ongoing", "noon", "generally", "week", "day", "wmeals", "q"]    # find if the texts has any singulars in it
+    overlap = [text for text in texts if text in singulars] #if any chroEntity is in singulars
+    return len(overlap)>0 or text_norm in singulars or re.search("\d+x(week|month|day)", text_norm) is not None # check for 4xweek, etc
         ##END OF FUNCTIONS TO BE USED IN PATTERN RECOGNITION##

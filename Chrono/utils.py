@@ -52,6 +52,8 @@ from Chrono import referenceToken
 from collections import OrderedDict
 import numpy as np
 import spacy
+from chronoML import FrequencyRNN as rnn
+
 # from word2number import w2n
 from Chrono import w2ny as w2n
 import string
@@ -100,10 +102,9 @@ def preProcessPhrases(phraseList):
                 tokList[n]=referenceToken.refToken(id=tokList[n-1].getID(), text=fullText, start_span=fullSpan[0], end_span=fullSpan[1], pos=tokList[n-1].getPos(),
                              temporal=False)
                 tokList[n].setNumericRange(True)
-                tokList.pop(n-1)
                 tokList.pop(n+1)
+                tokList.pop(n-1)
                 n-=1
-                print("New entity",fullText, fullSpan)
             n+=1
         phrase.setItems(tokList)
     #combine "four (4)" into one numeric refTok
@@ -121,9 +122,9 @@ def preProcessPhrases(phraseList):
                 tokList[n].setNumeric(True)
                 tokList.pop(n+1)
                 n-=1
-                print("New num entity",fullText, fullSpan)
             n+=1
         phrase.setItems(tokList)
+    return phraseList
 ## Writes out the full XML file for all T6entities in list.
 # @author Amy Olex
 # @param chrono_list The list of Chrono objects needed to be written in the file.
@@ -1061,7 +1062,7 @@ def isValidFreqPhrase(items):
         singulars = ["daily", "nightly", "tuthsa", "mowefr", "qmowefr", "qtuthsa", "bedtime",
                      "qmonth", "qday", "once", "ongoing", "noon"]
         # find if the texts has any singulars in it
-        return text_norm in singulars or re.search("\d+xweek", text_norm) #check for 4xweek, etc
+        return text_norm in singulars or re.search("\d+x(week|month|day)", text_norm)  # check for 4xweek, etc
 
 
 ## Extract dose phrases (strength phrases in N2C2) from the marked list of reference tokens
