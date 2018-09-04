@@ -135,7 +135,7 @@ if __name__ == "__main__":
         for x, y in zip(nnXList, nnYList):
             xTotal.append(x)
             yTotal.append(y)
-        
+
         chrono_master_list=[]
         if (args.m=='1'):
             if (len(nnXList)>0):
