@@ -74,7 +74,7 @@ def buildChronoList(TimePhraseList, chrono_id, ref_list):
 
 
         #chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
-        chrono_tmp_list, chrono_id, nnPhrase = buildFrequency(s, chrono_id, chrono_tmp_list, ref_list)
+        chrono_tmp_list, chrono_id = buildFrequency(s, chrono_id, chrono_tmp_list, ref_list)
         chrono_list = chrono_list+chrono_tmp_list
         chrono_tmp_list=[]
         # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
@@ -90,6 +90,19 @@ def buildChronoListML(TimePhraseList, chrono_id, ref_list, X, classifier):
     ref_list = referenceToken.replacePunctuation(ref_list)
     ## Convert to lowercase
     ref_list = referenceToken.lowercase(ref_list)
+    n=0
+    while n <len(TimePhraseList):
+        s=TimePhraseList[n]
+        if (hasSingular(s.getItems())):
+            chrono_list.append(chrono.ChronoFrequencyEntity(id=str(chrono_id) + "entity", label="Frequency", span=s.getSpan(),
+                                             text=s.getText()))
+            chrono_id+=1
+            TimePhraseList.pop(n)
+            n-=1
+        n+=1
+    if len(TimePhraseList)!=len(X):
+        print("FATAL ERROR: LEN(PHRASE FEATURES)!=LEN(PHRASES)")
+        exit(1)
     for s, x in zip(TimePhraseList, X):
         chrono_tmp_list = []
         # this is the new chrono time flags so we don't duplicate effort.  Will ned to eventually re-write this flow.
@@ -102,44 +115,67 @@ def buildChronoListML(TimePhraseList, chrono_id, ref_list, X, classifier):
         chrono_list = chrono_list+chrono_tmp_list
         chrono_tmp_list=[]
         # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
-
     return chrono_list, chrono_id
-def getMLFeats(TimePhraseList, currentFile):
+
+
+
+def getMLFeats(TimePhraseList, currentFile=None):
     frequencySpans = []
-    with open(currentFile, "r") as annFile:
-        anns = annFile.readlines()
-    for ann in anns:
-        if "Frequency" in ann:
-            while re.search("\d+;\d+", ann) is not None:
-                ann = re.sub(" \d+;\d+ ", " ", ann)
-            match = re.search("^T\d+\tFrequency (?P<start>\d+)\ (?P<end>\d+)", ann)
-            if match is not None:
-                frequencySpans.append([match.group('start'), match.group('end')])
+    freqPhrases= []
+    if currentFile is not None:
+        with open(currentFile, "r") as annFile:
+            anns = annFile.readlines()
+        for ann in anns:
+            if "Frequency" in ann:
+                while re.search("\d+;\d+", ann) is not None:
+                    ann = re.sub(" \d+;\d+ ", " ", ann)
+                match = re.search("^T\d+\tFrequency (?P<start>\d+)\ (?P<end>\d+)(?P<phrase>.*)", ann)
+                if match is not None:
+                    frequencySpans.append([match.group('start'), match.group('end')])
+                    freqPhrases.append(match.group('phrase'))
+
     nnXList = []  # a 3d vector of features for all phrases
     nnYList = []
+    deb = open("/home/garnt/Documents/MLCheckingGenned.out", "a")
+    deb2 = open("/home/garnt/Documents/MLCheckingGold.out", "a")
+    matches=0
+    for span, phrase in zip(frequencySpans, freqPhrases):
+        goldStart = int(span[0])
+        goldEnd = int(span[1])
+        deb2.write("\nGold Start: " + str(goldStart) + "\nGoldEnd " + str(goldEnd) + "\n"+phrase)
+    deb2.write("\n"+currentFile)
+    deb2.close()
     for s in TimePhraseList:
         # this is the new chrono time flags so we don't duplicate effort.  Will ned to eventually re-write this flow.
         # The flags are in the order: [loneDigitYear, month, day, hour, minute, second]
 
         # chrono_tmp_list, chrono_id = DoseDuration.buildDoseDuration(s, chrono_id, chrono_tmp_list, ref_list, PIclassifier, PIfeatures)
         nnPhrase = getNN(s)
+
         if hasSingular(s.getItems()):
             continue
         gennedStart = s.getSpan()[0]
         gennedEnd = s.getSpan()[1]
+        deb.write("\nGenned Start: " + str(gennedStart) + "\nGennedEnd " + str(gennedEnd)+ "\n"+s.getText())
+
         isReal = False
-        for span in frequencySpans:
+        for span, phrase in zip(frequencySpans, freqPhrases):
             goldStart = int(span[0])
             goldEnd = int(span[1])
-            if (gennedStart < goldStart and gennedEnd > goldEnd) or \
-                    (abs(gennedStart - goldStart) < 6 and abs(gennedEnd - goldEnd) < 6):
+            if (gennedStart < goldStart and gennedEnd > goldEnd) or (abs(gennedStart - goldStart) < 6 and abs(gennedEnd - goldEnd) < 6):
                 isReal = True
+                matches+=1
+        deb.write("\nMATCHED: " + str(isReal))
         nnYList.append(isReal)
         nnXList.append(nnPhrase)
         # tmplist, chrono_id = buildSubIntervals(chrono_tmp_list, chrono_id, dct, ref_list)
         chrono_tmp_list = []
-    return nnYList, nnXList
-
+    if currentFile is not None:
+        deb.write("\n"+currentFile+" "+str(matches))
+        deb.close()
+        return nnYList, nnXList
+    else:
+        return None, nnXList
 
 ####
 #END_MODULE
@@ -155,8 +191,10 @@ def buildFrequency(s, chrono_id, chrono_tmp_list, ref_list):
     return chrono_tmp_list, chrono_id
 def buildFrequencyML(s, chrono_id, chrono_tmp_list, x, classifier):
     flag= rnn.classify(classifier, x) or hasSingular(s.getItems())
+    #print(flag, "  TEXT: ", s.getText())
     if (flag):
         chrono_tmp_list.append(chrono.ChronoFrequencyEntity(id=str(chrono_id) + "entity", label="Frequency",span=s.getSpan(), text=s.getText()))
+        chrono_id+=1
     chrono_id+=1
     return chrono_tmp_list, chrono_id
 def getNN(s):
@@ -164,19 +202,16 @@ def getNN(s):
     for refTok in s.getItems():
         thisPhrase.append([
             isIn(refTok, "once", "twice"),
-            isIn(refTok, "per", "each", "every"),
+            isIn(refTok, "a","per", "each", "every"),
             isIn(refTok, "times"),
-            isIn(refTok, "a"),
             isIn(refTok, "as"),
             isIn(refTok, "needed", "directed"),
             isIn(refTok, "at"),
             isIn(refTok, "q"),
             isIn(refTok, "other"),
-            isIn(refTok, "other"),
             isIn(refTok, "with"),
-            isIn(refTok, "meals"),
+            isIn(refTok, "meals","breakfast", "lunch", "dinner"),
             isIn(refTok, "weekly"),
-            isIn(refTok, "breakfast", "lunch", "dinner"),
             isIn(refTok, "only"),
             isIn(refTok, "if"),
             isIn(refTok, "necessary"),
@@ -258,8 +293,7 @@ def hasFrequency(s):
             if (functList[position](refTok, *dict_of_funct_inputs[key][position])):
                 funct_iterators[key]+=1 #we passed this one, so iterate the position of the match
                 if funct_iterators[key]>=len(functList):
-                    if (key == ""):
-                        print("SUCCESS!", s.getText())
+
                     return True #if we have progressed to the end of a pattern, we did it!
             else:
                 funct_iterators[key]=0

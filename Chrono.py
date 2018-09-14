@@ -74,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', metavar='MLTrainData', type=str, help='A string representing the file name that contains the CSV file with the training data matrix.', required=False, default=False)
     parser.add_argument('-c', metavar='MLTrainClass', type=str, help='A string representing the file name that contains the known classes for the training data matrix.', required=False, default=False)
     parser.add_argument('-M', metavar='MLmodel', type=str, help='The path and file name of a pre-build ML model for loading.', required=False, default=None)
+    parser.add_argument('-T', metavar='TrainingPath', type=str, help='1 if we are training a new model, 0 otherwise', required=False, default='0')
     parser.add_argument('-X', metavar='XMLOUT', type=str, help='1 if you want xml out, 0 otherwise (deafault 0)', required=False, default='0')
     args = parser.parse_args()
     ## Now we can access each argument as args.i, args.o, args.r
@@ -106,6 +107,8 @@ if __name__ == "__main__":
     classifier=keras.models.load_model(args.M)
     xTotal=[]
     yTotal=[]
+    totDiff=0
+    #TODO delete
     for f in range(0,len(infiles)) :
         print("Parsing "+ infiles[f] +" ...")
         ## Init the ChronoEntity list
@@ -131,26 +134,32 @@ if __name__ == "__main__":
         freqPhrases = utils.getFrequencyPhrases(chroList, text)
 
         freqPhrases = utils.preProcessPhrases(freqPhrases)
-        nnYList, nnXList = BuildEntities.getMLFeats(freqPhrases, infiles[f]+".ann")
-        for x, y in zip(nnXList, nnYList):
-            xTotal.append(x)
-            yTotal.append(y)
-
+        nnYList, nnXList = BuildEntities.getMLFeats(freqPhrases, infiles[f] + ".ann" if args.T=='1' else None)
+        if (args.T=='1'):
+            for x, y in zip(nnXList, nnYList):
+                xTotal.append(x)
+                yTotal.append(y)
+        else:
+            for x in nnXList:
+                xTotal.append(x)
         chrono_master_list=[]
+        chro_check_list, useless = BuildEntities.buildChronoList(freqPhrases, 0, chroList)
+
         if (args.m=='1'):
             if (len(nnXList)>0):
                 chrono_master_list, my_freq_ID_counter =BuildEntities.buildChronoListML(TimePhraseList=freqPhrases, chrono_id=chrono_ID_counter, ref_list= chroList, X=nnXList, classifier=classifier)
             else:
                 print("skipped")
+                chrono_master_list, my_freq_ID_counter = BuildEntities.buildChronoList(freqPhrases,
+                                                                                       chrono_ID_counter, chroList)
         else:
             chrono_master_list, my_freq_ID_counter = BuildEntities.buildChronoList(freqPhrases,
                                                                              chrono_ID_counter, chroList)
-        
+
         print("Number of Chrono Entities: " + str(len(chrono_master_list)))
         if (args.X=='1'):
             utils.write_xml(chrono_list=chrono_master_list, outfile=xml_outfiles[f])
         utils.write_ann(chrono_list=chrono_master_list, outfile=ann_outfiles[f])
-        """
-    classifier=rnn.build_model(xTotal, yTotal)
-    classifier.save("/home/garnt/Documents/Models/2.pkl")
-        """
+    if args.T =='1':
+        classifier=rnn.build_model(xTotal, yTotal)
+        classifier.save("/home/garnt/Documents/Models/2.pkl")

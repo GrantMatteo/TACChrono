@@ -30,10 +30,11 @@ def build_model(train_data, train_labels):
     model.add(SimpleRNN(1, activation="relu", input_shape=(X.shape[1], X.shape[2])))
     model.add(Dense(1, activation='sigmoid'))
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
     print("Training...")
-    model.fit(X, Y, epochs=100, batch_size=10)
-    print("Model: ")
-    print(model.summary())
+    model.fit(X, Y, epochs=100, batch_size=10, verbose=0)
+    #print("Model: ")
+    #print(model.summary())
     return model
 
 
@@ -58,7 +59,7 @@ def classify(model, predict_data):
     padding = longest-len(predict_data)
     X = np.pad(predict_data,[(0,padding),(0,0)],mode="constant")
     X = np.expand_dims(X, axis=0)
-    print("Predicting on {}".format(X))
-    prediction = model.predict(X, verbose=1)
-    print("The prediction is: {}".format(np.round(prediction[0])))
+    #print("Predicting on {}".format(X))
+    prediction = model.predict(X, verbose=0)
+    #print("The prediction is: {}".format(np.round(prediction[0])))
     return np.round(prediction[0])
